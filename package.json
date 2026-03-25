@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "start": "concurrently -n gateway,auth,tasks -c cyan,yellow,green \"npm --prefix gateway start\" \"npm --prefix auth start\" \"npm --prefix tasks start\"",
+    "start": "npm run install:services && concurrently -n gateway,auth,tasks -c cyan,yellow,green \"npm --prefix gateway start\" \"npm --prefix auth start\" \"npm --prefix tasks start\"",
     "start:gateway": "npm --prefix gateway start",
     "start:auth": "npm --prefix auth start",
     "start:tasks": "npm --prefix tasks start",
