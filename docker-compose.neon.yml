@@ -1,0 +1,29 @@
+services:
+  auth-service:
+    build: ./auth
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+
+  tasks-service:
+    build: ./tasks
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DATABASE_URL: ${DATABASE_URL}
+
+  api-gateway:
+    build: ./gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      AUTH_SERVICE: http://auth-service:3001
+      TASKS_SERVICE: http://tasks-service:3002
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+    depends_on:
+      - auth-service
+      - tasks-service

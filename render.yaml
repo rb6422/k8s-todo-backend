@@ -2,8 +2,8 @@ services:
   - type: web
     name: taskflow-auth
     runtime: docker
-    dockerContext: ./backend/auth
-    dockerfilePath: ./backend/auth/Dockerfile
+    dockerContext: ./auth
+    dockerfilePath: ./auth/Dockerfile
     envVars:
       - key: PORT
         value: 3001
@@ -15,8 +15,8 @@ services:
   - type: web
     name: taskflow-tasks
     runtime: docker
-    dockerContext: ./backend/tasks
-    dockerfilePath: ./backend/tasks/Dockerfile
+    dockerContext: ./tasks
+    dockerfilePath: ./tasks/Dockerfile
     envVars:
       - key: PORT
         value: 3002
@@ -26,8 +26,8 @@ services:
   - type: web
     name: taskflow-gateway
     runtime: docker
-    dockerContext: ./backend/gateway
-    dockerfilePath: ./backend/gateway/Dockerfile
+    dockerContext: ./gateway
+    dockerfilePath: ./gateway/Dockerfile
     envVars:
       - key: PORT
         value: 3000
