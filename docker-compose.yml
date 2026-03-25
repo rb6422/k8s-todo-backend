@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: taskflow
+      POSTGRES_USER: taskflow_user
+      POSTGRES_PASSWORD: taskflow_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow_user -d taskflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./auth
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      JWT_SECRET: dev-jwt-secret-local
+      DATABASE_URL: postgresql://taskflow_user:taskflow_pass@postgres:5432/taskflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tasks-service:
+    build: ./tasks
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://taskflow_user:taskflow_pass@postgres:5432/taskflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    build: ./gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      AUTH_SERVICE: http://auth-service:3001
+      TASKS_SERVICE: http://tasks-service:3002
+      ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,https://k8s-todo.vercel.app,https://k8s-todo.pages.dev
+    depends_on:
+      - auth-service
+      - tasks-service
+
+volumes:
+  postgres_data:
+    driver: local

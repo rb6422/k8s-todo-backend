@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: taskflow-auth
+    runtime: docker
+    dockerContext: ./backend/auth
+    dockerfilePath: ./backend/auth/Dockerfile
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+
+  - type: web
+    name: taskflow-tasks
+    runtime: docker
+    dockerContext: ./backend/tasks
+    dockerfilePath: ./backend/tasks/Dockerfile
+    envVars:
+      - key: PORT
+        value: 3002
+      - key: DATABASE_URL
+        sync: false
+
+  - type: web
+    name: taskflow-gateway
+    runtime: docker
+    dockerContext: ./backend/gateway
+    dockerfilePath: ./backend/gateway/Dockerfile
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: AUTH_SERVICE
+        sync: false
+      - key: TASKS_SERVICE
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
