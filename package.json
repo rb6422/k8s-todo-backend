@@ -1,0 +1,15 @@
+{
+  "name": "k8s-todo-backend",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "concurrently -n gateway,auth,tasks -c cyan,yellow,green \"npm --prefix gateway start\" \"npm --prefix auth start\" \"npm --prefix tasks start\"",
+    "start:gateway": "npm --prefix gateway start",
+    "start:auth": "npm --prefix auth start",
+    "start:tasks": "npm --prefix tasks start",
+    "install:services": "npm --prefix gateway install && npm --prefix auth install && npm --prefix tasks install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -2,6 +2,9 @@
   "name": "tasks-service",
   "version": "1.0.0",
   "main": "index.js",
-  "dependencies": { "pg": "^8.11.3" },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
+    "dotenv": "^16.6.1"
+  },
   "scripts": { "start": "node index.js" }
 }

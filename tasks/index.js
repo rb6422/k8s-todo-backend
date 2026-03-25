@@ -1,14 +1,19 @@
+require("dotenv").config();
+
 const http   = require("http");
-const { Pool } = require("pg");
+const { neon } = require("@neondatabase/serverless");
 
 const PORT   = process.env.PORT         || 3002;
 const DB_URL = process.env.DATABASE_URL;
 
-// ── PostgreSQL ─────────────────────────────────────────────
-const pool = new Pool({ connectionString: DB_URL });
+if (!DB_URL) {
+  throw new Error("DATABASE_URL is required");
+}
+
+const sql = neon(DB_URL);
 
 async function initDB() {
-  await pool.query(`
+  await sql`
     CREATE TABLE IF NOT EXISTS tasks (
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER NOT NULL,
@@ -19,7 +24,7 @@ async function initDB() {
       created_at  TIMESTAMPTZ DEFAULT NOW(),
       updated_at  TIMESTAMPTZ DEFAULT NOW()
     )
-  `);
+  `;
   console.log("[tasks] DB ready");
 }
 
@@ -41,67 +46,85 @@ function getUserId(req) {
 // ── Route handlers ─────────────────────────────────────────
 async function listTasks(userId, query) {
   const { status, priority } = query;
-  let sql    = "SELECT * FROM tasks WHERE user_id=$1";
-  const vals = [userId];
-  if (status)   { sql += ` AND status=$${vals.length+1}`;   vals.push(status); }
-  if (priority) { sql += ` AND priority=$${vals.length+1}`; vals.push(priority); }
-  sql += " ORDER BY created_at DESC";
-  const result = await pool.query(sql, vals);
-  return { status: 200, data: result.rows };
+  let result;
+
+  if (status && priority) {
+    result = await sql`
+      SELECT * FROM tasks
+      WHERE user_id=${userId} AND status=${status} AND priority=${priority}
+      ORDER BY created_at DESC
+    `;
+  } else if (status) {
+    result = await sql`
+      SELECT * FROM tasks
+      WHERE user_id=${userId} AND status=${status}
+      ORDER BY created_at DESC
+    `;
+  } else if (priority) {
+    result = await sql`
+      SELECT * FROM tasks
+      WHERE user_id=${userId} AND priority=${priority}
+      ORDER BY created_at DESC
+    `;
+  } else {
+    result = await sql`
+      SELECT * FROM tasks
+      WHERE user_id=${userId}
+      ORDER BY created_at DESC
+    `;
+  }
+
+  return { status: 200, data: result };
 }
 
 async function createTask(userId, body) {
   const { title, description = "", priority = "medium" } = body;
   if (!title) return { status: 400, data: { error: "title is required" } };
-  const result = await pool.query(
-    `INSERT INTO tasks (user_id, title, description, priority)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [userId, title, description, priority]
-  );
-  return { status: 201, data: result.rows[0] };
+  const result = await sql`
+    INSERT INTO tasks (user_id, title, description, priority)
+    VALUES (${userId}, ${title}, ${description}, ${priority})
+    RETURNING *
+  `;
+  return { status: 201, data: result[0] };
 }
 
 async function getTask(userId, taskId) {
-  const result = await pool.query(
-    "SELECT * FROM tasks WHERE id=$1 AND user_id=$2",
-    [taskId, userId]
-  );
-  if (!result.rows[0]) return { status: 404, data: { error: "Task not found" } };
-  return { status: 200, data: result.rows[0] };
+  const result = await sql`SELECT * FROM tasks WHERE id=${taskId} AND user_id=${userId}`;
+  if (!result[0]) return { status: 404, data: { error: "Task not found" } };
+  return { status: 200, data: result[0] };
 }
 
 async function updateTask(userId, taskId, body) {
   const { title, description, status, priority } = body;
-  const result = await pool.query(
-    `UPDATE tasks SET
-       title       = COALESCE($3, title),
-       description = COALESCE($4, description),
-       status      = COALESCE($5, status),
-       priority    = COALESCE($6, priority),
-       updated_at  = NOW()
-     WHERE id=$1 AND user_id=$2 RETURNING *`,
-    [taskId, userId, title, description, status, priority]
-  );
-  if (!result.rows[0]) return { status: 404, data: { error: "Task not found" } };
-  return { status: 200, data: result.rows[0] };
+  const result = await sql`
+    UPDATE tasks SET
+      title       = COALESCE(${title}, title),
+      description = COALESCE(${description}, description),
+      status      = COALESCE(${status}, status),
+      priority    = COALESCE(${priority}, priority),
+      updated_at  = NOW()
+    WHERE id=${taskId} AND user_id=${userId}
+    RETURNING *
+  `;
+  if (!result[0]) return { status: 404, data: { error: "Task not found" } };
+  return { status: 200, data: result[0] };
 }
 
 async function deleteTask(userId, taskId) {
-  const result = await pool.query(
-    "DELETE FROM tasks WHERE id=$1 AND user_id=$2 RETURNING id",
-    [taskId, userId]
-  );
-  if (!result.rows[0]) return { status: 404, data: { error: "Task not found" } };
+  const result = await sql`DELETE FROM tasks WHERE id=${taskId} AND user_id=${userId} RETURNING id`;
+  if (!result[0]) return { status: 404, data: { error: "Task not found" } };
   return { status: 200, data: { message: "Task deleted" } };
 }
 
 async function getStats(userId) {
-  const result = await pool.query(
-    `SELECT status, COUNT(*) as count FROM tasks WHERE user_id=$1 GROUP BY status`,
-    [userId]
-  );
+  const result = await sql`
+    SELECT status, COUNT(*) as count
+    FROM tasks
+    WHERE user_id=${userId}
+    GROUP BY status
+  `;
   const stats = { pending: 0, in_progress: 0, done: 0, total: 0 };
-  result.rows.forEach(r => {
+  result.forEach(r => {
     stats[r.status] = parseInt(r.count);
     stats.total += parseInt(r.count);
   });

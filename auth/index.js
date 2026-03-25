@@ -1,23 +1,28 @@
+require("dotenv").config();
+
 const http    = require("http");
 const crypto  = require("crypto");
-const { Pool } = require("pg");
+const { neon } = require("@neondatabase/serverless");
 
 const PORT       = process.env.PORT       || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-prod";
 const DB_URL     = process.env.DATABASE_URL;
 
-// ── PostgreSQL pool ────────────────────────────────────────
-const pool = new Pool({ connectionString: DB_URL });
+if (!DB_URL) {
+  throw new Error("DATABASE_URL is required");
+}
+
+const sql = neon(DB_URL);
 
 async function initDB() {
-  await pool.query(`
+  await sql`
     CREATE TABLE IF NOT EXISTS users (
       id         SERIAL PRIMARY KEY,
       username   VARCHAR(50) UNIQUE NOT NULL,
       password   VARCHAR(64) NOT NULL,   -- SHA-256 hex
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
-  `);
+  `;
   console.log("[auth] DB ready");
 }
 
@@ -47,11 +52,12 @@ async function register(body) {
   const { username, password } = body;
   if (!username || !password) return { status: 400, data: { error: "username and password required" } };
   try {
-    const result = await pool.query(
-      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
-      [username, hashPassword(password)]
-    );
-    const user  = result.rows[0];
+    const result = await sql`
+      INSERT INTO users (username, password)
+      VALUES (${username}, ${hashPassword(password)})
+      RETURNING id, username
+    `;
+    const user  = result[0];
     const token = signToken({ userId: user.id, username: user.username });
     return { status: 201, data: { token, user: { id: user.id, username: user.username } } };
   } catch (e) {
@@ -63,8 +69,8 @@ async function register(body) {
 async function login(body) {
   const { username, password } = body;
   if (!username || !password) return { status: 400, data: { error: "username and password required" } };
-  const result = await pool.query("SELECT * FROM users WHERE username=$1", [username]);
-  const user   = result.rows[0];
+  const result = await sql`SELECT * FROM users WHERE username=${username}`;
+  const user   = result[0];
   if (!user || user.password !== hashPassword(password))
     return { status: 401, data: { error: "Invalid credentials" } };
   const token = signToken({ userId: user.id, username: user.username });
